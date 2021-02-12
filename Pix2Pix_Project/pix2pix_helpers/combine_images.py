@@ -13,9 +13,9 @@ from PIL import Image
 ##
 
 # Paths variables (change these to use your own dataset)
-PATH_A = os.path.realpath("facades/A")          # Represents the input image
-PATH_B = os.path.realpath("facades/B")          # Represents the target image
-PATH_AB = os.path.realpath("facades/AB")        # Represents the combined folder
+PATH_A =  os.path.realpath("blobs/A")          # Represents the input image
+PATH_B =  os.path.realpath("blobs/B")          # Represents the target image
+PATH_AB = os.path.realpath("blobs/AB")         # Represents the combined folder
 
 # Function to write the combined images
 def write_image(path_A, path_B, path_AB):

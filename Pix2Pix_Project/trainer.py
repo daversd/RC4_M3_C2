@@ -14,23 +14,27 @@ from pix2pix_helpers.pix2pix_model import Pix2PixModel
 from matplotlib import pyplot as plt
 import time
 import os
+import glob
 
 ##
 # High level setup
 ##
 
-TRAIN = True            # Determines if the program must enter training mode
-TEST = True             # Determines if the program must enter testing mode (loads the latest checkpoint)
-TEST_SAMPLE = 5         # The number of samples for testing mode
-WRITE_LOGS = True       # Determines if tensorboard logs should be written to disk
-SAVE_CKPTS = True       # Determines if checkpoints should be saved
-SAVE_IMG_CKPT = True    # Determines if images should be saved for each checkpoint
-EXPORT_MODEL = True     # Determines if the model should be exported (loads the latest checkpoint)
+TRAIN = False            # Determines if the program must enter training mode
+TEST = False              # Determines if the program must enter testing mode (loads the latest checkpoint)
+TEST_SAMPLE = 20         # The number of samples for testing mode
+WRITE_LOGS = False       # Determines if tensorboard logs should be written to disk
+SAVE_CKPTS = False       # Determines if checkpoints should be saved
+SAVE_IMG_CKPT = False    # Determines if images should be saved for each checkpoint
+EXPORT_MODEL = False     # Determines if the model should be exported (loads the latest checkpoint)
 
-MODEL_NAME = 'pix2pix_run_1'                            # The name of the model for this run
+FOLDER_NAME = 'blobs'                                   # The name of the data folder
+MODEL_NAME = 'blobs_run_1'                              # The name of the model for this run
+LOAD_NUMBER = -1                                        # Number of the model to be loaded (-1 loads the latest)
 CKPT_DIR = os.path.join('checkpoints', MODEL_NAME)      # The folder to save checkpoints to
 LOG_DIR = 'runs/' + MODEL_NAME                          # The folder to save tensorboard logs to
 TEST_DIR = 'test/' + MODEL_NAME                         # The folder to save test images to
+
 
 # Create the required folders
 if SAVE_CKPTS:
@@ -46,11 +50,11 @@ if SAVE_IMG_CKPT:
         os.makedirs(TEST_DIR)
 
 BATCH_SIZE = 1
-EPOCHS = 10                 # Will be split in two parts, must be even
+EPOCHS = 300                # Will be split in two parts, must be even
 
 PRINT_FREQ = 100            # Interval of steps between print logs
 LOG_FREQ = 100              # Interval of steps between tensorboard logs
-CKPT_FREQ = 2               # Interval of epochs between checkpoints
+CKPT_FREQ = 20              # Interval of epochs between checkpoints
 
 # Initialize the log writer
 if WRITE_LOGS:
@@ -62,11 +66,37 @@ DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # Main program
 ##
 
+def load_model(model):
+    """
+    Loads the networks from the checkpoint specified in LOAD_NUMBER
+    Use -1 to load the latest model.
+    """
+    
+    list_of_files = glob.glob(CKPT_DIR + '/*.pth')
+
+    if LOAD_NUMBER == -1:
+        file_path = max(list_of_files, key=os.path.getctime)
+        file_name = os.path.basename(file_path)
+        file_number = file_name.split('_')[0]
+        print(file_number)
+    else:
+        file_number = LOAD_NUMBER
+    
+    file_prefix = os.path.join(CKPT_DIR, str(file_number) + '_')
+    netG_File = file_prefix + 'net_G.pth'
+    netD_File = file_prefix + 'net_D.pth'
+    
+    files_exist = os.path.exists(netG_File) and os.path.exists(netD_File)
+    assert files_exist, f"Checkpoint {LOAD_NUMBER} does not exist. Check '{CKPT_DIR}' to see available checkpoints"
+    print(f"Loading model from checkpoint {file_number} \n"+ f"Generator is {netG_File} \n" + f"Discriminator is {netD_File}")
+
+    model.load_networks(file_number)
+            
 if __name__ == '__main__':
     if TRAIN:
         # Create the training data set
-        trainData = ImageFolderLoader("facades/AB", phase='train')
-        trainSet = torch.utils.data.DataLoader(trainData, batch_size=BATCH_SIZE, shuffle= False, num_workers=4)
+        trainData = ImageFolderLoader(f"{FOLDER_NAME}/AB", phase='train', preprocess='none')
+        trainSet = torch.utils.data.DataLoader(trainData, batch_size=BATCH_SIZE, shuffle= True, num_workers=4)
         
         # Create the pix2pix model
         model = Pix2PixModel(CKPT_DIR, MODEL_NAME, is_train=True, n_epochs=EPOCHS/2, n_epochs_decay=EPOCHS/2)
@@ -144,14 +174,14 @@ if __name__ == '__main__':
     
     if TEST:
         # Create the testing data set
-        testData = ImageFolderLoader('facades/AB', phase='test', flip=False)
+        testData = ImageFolderLoader(f'{FOLDER_NAME}/AB', phase='test', flip=False, preprocess='none')
         testSet = torch.utils.data.DataLoader(testData, batch_size=BATCH_SIZE, shuffle= False, num_workers=0)
 
         # Create the pix2pix model in testing mode
         model = Pix2PixModel(CKPT_DIR, MODEL_NAME, is_train=False, n_epochs=EPOCHS/2, n_epochs_decay=EPOCHS/2)
         model.setup()
         model.eval()
-        model.load_networks(0)
+        load_model(model)
 
         # Iterate through test data set, for the lenght of the test sample
         for i, data in enumerate(testSet):
@@ -172,7 +202,7 @@ if __name__ == '__main__':
         model = Pix2PixModel(CKPT_DIR, MODEL_NAME, is_train=False, n_epochs=EPOCHS/2, n_epochs_decay=EPOCHS/2)
         model.setup()
         model.eval()
-        model.load_networks(0)
+        load_model(model)
 
         if not os.path.isdir('exported'):
             os.makedirs('exported')
@@ -181,3 +211,6 @@ if __name__ == '__main__':
         f = open(path, 'w+')
 
         torch.onnx.export(model.netG, x.to(DEVICE), path, training=torch.onnx.TrainingMode.EVAL, export_params=True, opset_version=10)
+    
+
+

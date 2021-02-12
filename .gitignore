@@ -12,6 +12,13 @@
 venv/
 [Ff]acades/AB
 __pycache__/
+**/blobs/*
+**/plans/*
+**/facades/*
+**/test/*
+checkpoints/
+exported/
+runs/
 
 # Never ignore Asset meta data
 !/[Aa]ssets/**/*.meta
